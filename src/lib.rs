@@ -1,180 +1,8 @@
-fn gcd<T>(t1: T, t2: T) -> T 
-    where T:
-        std::cmp::PartialEq +
-        std::ops::Rem +
-        std::convert::From<<T as std::ops::Rem>::Output> +
-        std::convert::From<i8> +
-        Copy
-{
-    if t2 != T::from(0) {
-        gcd(t2, T::from(t1 % t2))
-    } else {
-        t1
-    }
-}
+pub mod projection;
+pub mod support;
 
-pub struct Projection<T: Default + std::clone::Clone> {
-    p: i16,
-    q: u16,
-    pub bins: Vec<T>
-}
-
-pub type Transform<T> = Vec<Projection<T>>;
-
-impl<T> Projection<T> where T: Default + std::clone::Clone {
-    pub fn new(p: i16, q: u16, size: usize) -> Projection<T> {
-        let mut proj = Projection {
-            p: p,
-            q: q,
-            bins: vec![T::default(); size]
-        };
-        proj.reduce();
-        proj
-    }
-
-    fn reduce(&mut self) {
-        let g = gcd(self.p, self.q as i16);
-        self.p /= g;
-        self.q /= g as u16;
-    }
-
-    pub fn p(&self) -> i16 {
-        self.p
-    }
-
-    pub fn q(&self) -> u16 {
-        self.q
-    }
-
-    pub fn set_p(&mut self, p: i16) {
-        self.p = p;
-        self.reduce();
-    }
-
-    pub fn set_q(&mut self, q: u16) {
-        self.q = q;
-        self.reduce();
-    }
-}
-
-impl<T> Default for Projection<T> where T: Default + std::clone::Clone {
-    fn default() -> Projection<T> {
-        Projection {
-            p: 0,
-            q: 1,
-            bins: Vec::new()
-        }
-    }
-}
-
-impl<T> std::clone::Clone for Projection<T> where T: Default + std::clone::Clone {
-    fn clone(&self) -> Projection<T> {
-        Projection {
-            p: self.p,
-            q: self.q,
-            bins: self.bins.clone()
-        }
-    }
-}
-
-pub trait Support<T> {
-    fn get_data(&self, l: usize, k: usize) -> &T;
-    fn get_data_mut(&mut self, l: usize, k: usize) -> &mut T;
-    fn set_data(&mut self, l: usize, k: usize, t: T);
-    fn height(&self) -> usize;
-    fn width(&self) -> usize;
-    fn set_height(&mut self, height: usize);
-    fn set_width(&mut self, width: usize);
-}
-
-pub struct RectangularSupport<T: Default + std::clone::Clone> {
-    height: usize,
-    width: usize,
-    data: Vec<T>
-}
-
-pub struct LinearSupport<T: Default + std::clone::Clone> {
-    data: Vec<T>
-}
-
-impl<T> RectangularSupport<T> where T: Default + std::clone::Clone {
-    pub fn new(height: usize, width: usize) -> RectangularSupport<T> {
-        RectangularSupport {
-            height: height,
-            width: width,
-            data: vec![T::default(); height * width]
-        }
-    }
-}
-
-impl<T> Support<T> for RectangularSupport<T> where T: Default + std::clone::Clone {
-    fn get_data(&self, l: usize, k: usize) -> &T {
-        &self.data[l * self.width + k]
-    }
-
-    fn get_data_mut(&mut self, l: usize, k: usize) -> &mut T {
-        &mut self.data[l * self.width + k]
-    }
-
-    fn set_data(&mut self, l: usize, k: usize, t: T) {
-        self.data[l * self.width + k] = t;
-    }
-
-    fn height(&self) -> usize {
-        self.height
-    }
-
-    fn width(&self) -> usize {
-        self.width
-    }
-
-    fn set_height(&mut self, height: usize) {
-        self.height = height;
-        self.data.resize(self.height * self.width, T::default());
-    }
-
-    fn set_width(&mut self, width: usize) {
-        self.width = width;
-        self.data.resize(self.height * self.width, T::default());
-    }
-}
-
-impl<T> LinearSupport<T> where T: Default + std::clone::Clone {
-    pub fn new(size: usize) -> LinearSupport<T> {
-        LinearSupport {
-            data: vec![T::default(); size]
-        }
-    }
-}
-
-impl<T> Support<T> for LinearSupport<T> where T: Default + std::clone::Clone {
-    fn get_data(&self, _: usize, k: usize) -> &T {
-        &self.data[k]
-    }
-
-    fn get_data_mut(&mut self, _: usize, k: usize) -> &mut T {
-        &mut self.data[k]
-    }
-
-    fn set_data(&mut self, _: usize, k: usize, t: T) {
-        self.data[k] = t;
-    }
-
-    fn height(&self) -> usize {
-        1
-    }
-
-    fn width(&self) -> usize {
-        self.data.len()
-    }
-
-    fn set_height(&mut self, _: usize) {
-    }
-
-    fn set_width(&mut self, width: usize) {
-        self.data.resize(width, T::default());
-    }
-}
+use projection::*;
+use support::*;
 
 pub fn direct<T: Default + std::clone::Clone + std::ops::BitXorAssign, S: Support<T>>(support: S, projections: &mut Transform<T>) {
     let P = support.width(); // k
@@ -268,6 +96,17 @@ pub fn inverse<T: Default + std::clone::Clone + std::ops::BitXorAssign + std::cm
                 }
             }
         }
+    }
+}
+
+pub fn katz_criterion<T: Default + std::clone::Clone>(projections: &Transform<T>, support: &Support<T>) -> bool {
+    let sum_p = projections.iter().fold(0, |a, p| a + p.p().abs() as usize);
+    let sum_q = projections.iter().fold(0, |a, p| a + p.q() as usize);
+
+    if sum_p >= support.width() || sum_q >= support.height() {
+        true
+    } else {
+        false
     }
 }
 
@@ -441,5 +280,73 @@ mod tests {
         let res = vec![3, 8, 2];
         
         assert_eq!(res, support.data);
+    }
+
+    #[test]
+    fn katz_test() {
+        let support = RectangularSupport::<u8>::new(3, 4);
+
+        let mut transform = Transform::<u8>::new();
+        transform.push(Projection::<u8>::new(1, 0, 0));
+        transform.push(Projection::<u8>::new(1, 1, 0));
+        transform.push(Projection::<u8>::new(0, 1, 0));
+        transform.push(Projection::<u8>::new(-1, 1, 0));
+
+        assert_eq!(true, katz_criterion(&transform, &support));
+
+        let transform = transform[..3].to_vec();
+
+        assert_eq!(false, katz_criterion(&transform, &support));
+    }
+
+    #[test]
+    fn katz_test2() {
+        let support = RectangularSupport::<u8>::new(3, 3);
+
+        let mut transform = Transform::<u8>::new();
+        transform.push(Projection::<u8>::new(1, 0, 0));
+        transform.push(Projection::<u8>::new(1, 1, 0));
+        transform.push(Projection::<u8>::new(0, 1, 0));
+        transform.push(Projection::<u8>::new(-1, 1, 0));
+
+        assert_eq!(true, katz_criterion(&transform, &support));
+
+        let transform = transform[..3].to_vec();
+
+        assert_eq!(false, katz_criterion(&transform, &support));
+    }
+
+    #[test]
+    fn katz_test3() {
+        let support = LinearSupport::<u8>::new(3);
+
+        let mut transform = Transform::<u8>::new();
+        transform.push(Projection::<u8>::new(1, 0, 0));
+        transform.push(Projection::<u8>::new(1, 1, 0));
+        transform.push(Projection::<u8>::new(0, 1, 0));
+        transform.push(Projection::<u8>::new(-1, 1, 0));
+
+        assert_eq!(true, katz_criterion(&transform, &support));
+
+        let transform = transform[..1].to_vec();
+
+        assert_eq!(false, katz_criterion(&transform, &support));
+    }
+
+    #[test]
+    fn katz_test4() {
+        let support = RectangularSupport::<u8>::new(4, 3);
+
+        let mut transform = Transform::<u8>::new();
+        transform.push(Projection::<u8>::new(1, 0, 0));
+        transform.push(Projection::<u8>::new(1, 1, 0));
+        transform.push(Projection::<u8>::new(0, 1, 0));
+        transform.push(Projection::<u8>::new(-1, 1, 0));
+
+        assert_eq!(true, katz_criterion(&transform, &support));
+
+        let transform = transform[..3].to_vec();
+
+        assert_eq!(false, katz_criterion(&transform, &support));
     }
 }
