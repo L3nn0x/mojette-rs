@@ -77,9 +77,23 @@ impl<T> std::clone::Clone for Projection<T> where T: Default + std::clone::Clone
     }
 }
 
+pub trait Support<T> {
+    fn get_data(&self, l: usize, k: usize) -> &T;
+    fn get_data_mut(&mut self, l: usize, k: usize) -> &mut T;
+    fn set_data(&mut self, l: usize, k: usize, t: T);
+    fn height(&self) -> usize;
+    fn width(&self) -> usize;
+    fn set_height(&mut self, height: usize);
+    fn set_width(&mut self, width: usize);
+}
+
 pub struct RectangularSupport<T: Default + std::clone::Clone> {
     height: usize,
     width: usize,
+    data: Vec<T>
+}
+
+pub struct LinearSupport<T: Default + std::clone::Clone> {
     data: Vec<T>
 }
 
@@ -91,39 +105,78 @@ impl<T> RectangularSupport<T> where T: Default + std::clone::Clone {
             data: vec![T::default(); height * width]
         }
     }
+}
 
-    pub fn get_data(&self, l: usize, k: usize) -> &T {
+impl<T> Support<T> for RectangularSupport<T> where T: Default + std::clone::Clone {
+    fn get_data(&self, l: usize, k: usize) -> &T {
         &self.data[l * self.width + k]
     }
 
-    pub fn get_data_mut(&mut self, l: usize, k: usize) -> &mut T {
+    fn get_data_mut(&mut self, l: usize, k: usize) -> &mut T {
         &mut self.data[l * self.width + k]
     }
 
-    pub fn set_data(&mut self, l: usize, k: usize, t: T) {
+    fn set_data(&mut self, l: usize, k: usize, t: T) {
         self.data[l * self.width + k] = t;
     }
 
-    pub fn height(&self) -> usize {
+    fn height(&self) -> usize {
         self.height
     }
 
-    pub fn width(&self) -> usize {
+    fn width(&self) -> usize {
         self.width
     }
 
-    pub fn set_height(&mut self, height: usize) {
+    fn set_height(&mut self, height: usize) {
         self.height = height;
         self.data.resize(self.height * self.width, T::default());
     }
 
-    pub fn set_width(&mut self, width: usize) {
+    fn set_width(&mut self, width: usize) {
         self.width = width;
         self.data.resize(self.height * self.width, T::default());
     }
 }
 
-pub fn direct<T: Default + std::clone::Clone + std::ops::BitXorAssign>(support: RectangularSupport<T>, projections: &mut Transform<T>) {
+impl<T> LinearSupport<T> where T: Default + std::clone::Clone {
+    pub fn new(size: usize) -> LinearSupport<T> {
+        LinearSupport {
+            data: vec![T::default(); size]
+        }
+    }
+}
+
+impl<T> Support<T> for LinearSupport<T> where T: Default + std::clone::Clone {
+    fn get_data(&self, _: usize, k: usize) -> &T {
+        &self.data[k]
+    }
+
+    fn get_data_mut(&mut self, _: usize, k: usize) -> &mut T {
+        &mut self.data[k]
+    }
+
+    fn set_data(&mut self, _: usize, k: usize, t: T) {
+        self.data[k] = t;
+    }
+
+    fn height(&self) -> usize {
+        1
+    }
+
+    fn width(&self) -> usize {
+        self.data.len()
+    }
+
+    fn set_height(&mut self, _: usize) {
+    }
+
+    fn set_width(&mut self, width: usize) {
+        self.data.resize(width, T::default());
+    }
+}
+
+pub fn direct<T: Default + std::clone::Clone + std::ops::BitXorAssign, S: Support<T>>(support: S, projections: &mut Transform<T>) {
     let P = support.width(); // k
     let Q = support.height(); // l
 
@@ -149,7 +202,7 @@ pub fn direct<T: Default + std::clone::Clone + std::ops::BitXorAssign>(support: 
 
 struct Univoc(usize, usize);
 
-pub fn inverse<T: Default + std::clone::Clone + std::ops::BitXorAssign + std::cmp::PartialEq + std::fmt::Display>(support: &mut RectangularSupport<T>, mut projections: Transform<T>) {
+pub fn inverse<T: Default + std::clone::Clone + std::ops::BitXorAssign + std::cmp::PartialEq>(support: &mut Support<T>, mut projections: Transform<T>) {
     let P = support.width(); // k
     let Q = support.height(); // l
     let mut offsets = Vec::new();
@@ -314,6 +367,78 @@ mod tests {
         inverse(&mut support, transform);
 
         let res = vec![3, 8, 2, 4, 5, 42, 90, 34, 1, 55, 23, 99];
+        
+        assert_eq!(res, support.data);
+    }
+
+    #[test]
+    fn rectangular_test3() {
+        let mut support = RectangularSupport::<isize>::new(1, 3);
+        support.data[0] = 3;
+        support.data[1] = 8;
+        support.data[2] = 2;
+
+        let mut transform = Transform::<isize>::new();
+        transform.push(Projection::<isize>::new(1, 0, 0));
+        transform.push(Projection::<isize>::new(1, 1, 0));
+        transform.push(Projection::<isize>::new(0, 1, 0));
+        transform.push(Projection::<isize>::new(-1, 1, 0));
+
+        direct(support, &mut transform);
+
+        let mut support = RectangularSupport::<isize>::new(1, 3);
+
+        inverse(&mut support, transform);
+
+        let res = vec![3, 8, 2];
+        
+        assert_eq!(res, support.data);
+    }
+
+    #[test]
+    fn linear_test() {
+        let mut support = LinearSupport::<isize>::new(3);
+        support.data[0] = 3;
+        support.data[1] = 8;
+        support.data[2] = 2;
+
+        let mut transform = Transform::<isize>::new();
+        transform.push(Projection::<isize>::new(1, 0, 0));
+        transform.push(Projection::<isize>::new(1, 1, 0));
+        transform.push(Projection::<isize>::new(0, 1, 0));
+        transform.push(Projection::<isize>::new(-1, 1, 0));
+
+        direct(support, &mut transform);
+
+        let mut support = LinearSupport::<isize>::new(3);
+
+        inverse(&mut support, transform);
+
+        let res = vec![3, 8, 2];
+        
+        assert_eq!(res, support.data);
+    }
+
+    #[test]
+    fn linear_test2() {
+        let mut support = LinearSupport::<u8>::new(3);
+        support.data[0] = 3;
+        support.data[1] = 8;
+        support.data[2] = 2;
+
+        let mut transform = Transform::<u8>::new();
+        transform.push(Projection::<u8>::new(1, 0, 0));
+        transform.push(Projection::<u8>::new(1, 1, 0));
+        transform.push(Projection::<u8>::new(0, 1, 0));
+        transform.push(Projection::<u8>::new(-1, 1, 0));
+
+        direct(support, &mut transform);
+
+        let mut support = LinearSupport::<u8>::new(3);
+
+        inverse(&mut support, transform);
+
+        let res = vec![3, 8, 2];
         
         assert_eq!(res, support.data);
     }
