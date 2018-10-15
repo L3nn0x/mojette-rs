@@ -123,7 +123,7 @@ impl<T> RectangularSupport<T> where T: Default + std::clone::Clone {
     }
 }
 
-pub fn direct<T: Default + std::clone::Clone + std::ops::AddAssign>(support: RectangularSupport<T>, projections: &mut Transform<T>) {
+pub fn direct<T: Default + std::clone::Clone + std::ops::BitXorAssign>(support: RectangularSupport<T>, projections: &mut Transform<T>) {
     let P = support.width(); // k
     let Q = support.height(); // l
 
@@ -141,7 +141,7 @@ pub fn direct<T: Default + std::clone::Clone + std::ops::AddAssign>(support: Rec
 
         for l in 0..Q {
             for k in 0..P {
-                proj.bins[(k as isize * q as isize + (l as isize * p as isize - offset)) as usize] += support.get_data(l, k).clone();
+                proj.bins[(k as isize * q as isize + (l as isize * p as isize - offset)) as usize] ^= support.get_data(l, k).clone();
             }
         }
     }
@@ -149,7 +149,7 @@ pub fn direct<T: Default + std::clone::Clone + std::ops::AddAssign>(support: Rec
 
 struct Univoc(usize, usize);
 
-pub fn inverse<T: Default + std::clone::Clone + std::ops::AddAssign + std::ops::SubAssign + std::cmp::PartialEq + std::fmt::Display>(support: &mut RectangularSupport<T>, mut projections: Transform<T>) {
+pub fn inverse<T: Default + std::clone::Clone + std::ops::BitXorAssign + std::cmp::PartialEq + std::fmt::Display>(support: &mut RectangularSupport<T>, mut projections: Transform<T>) {
     let P = support.width(); // k
     let Q = support.height(); // l
     let mut offsets = Vec::new();
@@ -207,7 +207,7 @@ pub fn inverse<T: Default + std::clone::Clone + std::ops::AddAssign + std::ops::
             // update projections
             for (n, proj) in projections.iter_mut().enumerate() {
                 let index = (k as isize * proj.q() as isize + (l as isize * proj.p() as isize - offsets[n])) as usize;
-                proj.bins[index] -= bin.clone();
+                proj.bins[index] ^= bin.clone();
                 dietmar_projs[n].bins[index] -= dietmar;
                 unitary_projs[n].bins[index] -= 1;
                 if unitary_projs[n].bins[index] == 1 {
@@ -243,19 +243,6 @@ mod tests {
 
         direct(support, &mut transform);
 
-        let projection = [
-            (1, 0, vec![13, 51, 125]),
-            (1, 1, vec![3, 12, 97, 76, 1]),
-            (0, 1, vec![97, 47, 45]),
-            (-1, 1, vec![90, 38, 9, 50, 2])
-        ];
-
-        for (p, t) in projection.iter().zip(transform.clone()) {
-            assert_eq!(p.0, t.p);
-            assert_eq!(p.1, t.q);
-            assert_eq!(p.2, t.bins);
-        }
-
         let mut support = RectangularSupport::<usize>::new(3, 3);
 
         inverse(&mut support, transform);
@@ -267,7 +254,7 @@ mod tests {
 
     #[test]
     fn rectangular_test() {
-        let mut support = RectangularSupport::<isize>::new(3, 4);
+        let mut support = RectangularSupport::<usize>::new(3, 4);
         support.data[0] = 3;
         support.data[1] = 8;
         support.data[2] = 2;
@@ -277,23 +264,23 @@ mod tests {
         support.data[6] = 90;
         support.data[7] = 34;
         support.data[8] = 1;
-        support.data[9] = 55;
+        support.data[9] = std::usize::MAX;
         support.data[10] = 23;
         support.data[11] = 99;
 
-        let mut transform = Transform::<isize>::new();
-        transform.push(Projection::<isize>::new(1, 0, 0));
-        transform.push(Projection::<isize>::new(1, 1, 0));
-        transform.push(Projection::<isize>::new(0, 1, 0));
-        transform.push(Projection::<isize>::new(-1, 1, 0));
+        let mut transform = Transform::<usize>::new();
+        transform.push(Projection::<usize>::new(1, 0, 0));
+        transform.push(Projection::<usize>::new(1, 1, 0));
+        transform.push(Projection::<usize>::new(0, 1, 0));
+        transform.push(Projection::<usize>::new(-1, 1, 0));
 
         direct(support, &mut transform);
 
-        let mut support = RectangularSupport::<isize>::new(3, 4);
+        let mut support = RectangularSupport::<usize>::new(3, 4);
 
         inverse(&mut support, transform);
 
-        let res = vec![3, 8, 2, 4, 5, 42, 90, 34, 1, 55, 23, 99];
+        let res = vec![3, 8, 2, 4, 5, 42, 90, 34, 1, std::usize::MAX, 23, 99];
         
         assert_eq!(res, support.data);
     }
