@@ -1,23 +1,23 @@
 use super::*;
 
 pub fn direct<T: Default + std::clone::Clone + std::ops::BitXorAssign, S: Support<T>>(support: S, projections: &mut Transform<T>) {
-    let P = support.width(); // k
-    let Q = support.height(); // l
+    let pp = support.width(); // k
+    let qq = support.height(); // l
 
     for proj in projections.iter_mut() {
         let p = proj.p();
         let q = proj.q();
 
-        let size = p.abs() as usize * (Q - 1) + q as usize * (P - 1) + 1;
+        let size = p.abs() as usize * (qq - 1) + q as usize * (pp - 1) + 1;
 
         proj.bins = vec![T::default(); size];
 
         let offset = if p < 0 {
-            (Q - 1) as isize * p as isize
+            (qq - 1) as isize * p as isize
         } else { 0 };
 
-        for l in 0..Q {
-            for k in 0..P {
+        for l in 0..qq {
+            for k in 0..pp {
                 proj.bins[(k as isize * q as isize + (l as isize * p as isize - offset)) as usize] ^= support.get_data(l, k).clone();
             }
         }
@@ -27,8 +27,8 @@ pub fn direct<T: Default + std::clone::Clone + std::ops::BitXorAssign, S: Suppor
 struct Univoc(usize, usize);
 
 pub fn inverse<T: Default + std::clone::Clone + std::ops::BitXorAssign + std::cmp::PartialEq>(support: &mut Support<T>, mut projections: Transform<T>) {
-    let P = support.width(); // k
-    let Q = support.height(); // l
+    let pp = support.width(); // k
+    let qq = support.height(); // l
     let mut offsets = Vec::new();
     let mut unitary_projs = Vec::new();
     let mut dietmar_projs = Vec::new();
@@ -40,7 +40,7 @@ pub fn inverse<T: Default + std::clone::Clone + std::ops::BitXorAssign + std::cm
         let size = proj.bins.len();
 
         let offset = if p < 0 {
-            (Q - 1) as isize * p as isize
+            (qq - 1) as isize * p as isize
         } else { 0 };
         offsets.push(offset);
         unitary_projs.push(Projection::<usize>::new(p, q, size));
@@ -48,8 +48,8 @@ pub fn inverse<T: Default + std::clone::Clone + std::ops::BitXorAssign + std::cm
     }
 
     let mut dietmar = 0;
-    for l in 0..Q {
-        for k in 0..P {
+    for l in 0..qq {
+        for k in 0..pp {
             for (n, proj) in projections.iter().enumerate() {
                 let index = (k as isize* proj.q() as isize + (l as isize * proj.p() as isize - offsets[n])) as usize;
                 unitary_projs[n].bins[index] += 1;
@@ -76,8 +76,8 @@ pub fn inverse<T: Default + std::clone::Clone + std::ops::BitXorAssign + std::cm
 
         if unitary_projs[univoc.0].bins[univoc.1] == 1 {
             // update support
-            let l = dietmar / P;
-            let k = dietmar - l * P;
+            let l = dietmar / pp;
+            let k = dietmar - l * pp;
             support.set_data(l, k, bin.clone());
 
             // update projections
