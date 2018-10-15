@@ -2,8 +2,8 @@ pub mod projection;
 pub mod support;
 pub mod mt;
 
-use projection::*;
-use support::*;
+use projection::{Projection, Transform};
+use support::{LinearSupport, RectangularSupport, Support};
 
 pub fn katz_criterion<T: Default + std::clone::Clone>(projections: &Transform<T>, support: &Support<T>) -> bool {
     let sum_p = projections.iter().fold(0, |a, p| a + p.p().abs() as usize);
