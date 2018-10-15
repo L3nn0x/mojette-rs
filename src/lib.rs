@@ -235,6 +235,33 @@ mod tests {
     }
 
     #[test]
+    fn rectangular_test_missing_data() {
+        let mut support = RectangularSupport::<isize>::new(1, 3);
+        support.data[0] = 3;
+        support.data[1] = 8;
+        support.data[2] = 2;
+
+        let mut transform = Transform::<isize>::new();
+        transform.push(Projection::<isize>::new(1, 0, 0));
+        transform.push(Projection::<isize>::new(1, 1, 0));
+        transform.push(Projection::<isize>::new(0, 1, 0));
+        transform.push(Projection::<isize>::new(-1, 1, 0));
+
+        direct(support, &mut transform);
+
+        let mut support = RectangularSupport::<isize>::new(1, 3);
+
+        transform.pop();
+        transform.pop();
+
+        inverse(&mut support, transform);
+
+        let res = vec![3, 8, 2];
+        
+        assert_eq!(res, support.data);
+    }
+
+    #[test]
     fn linear_test() {
         let mut support = LinearSupport::<isize>::new(3);
         support.data[0] = 3;
@@ -250,6 +277,33 @@ mod tests {
         direct(support, &mut transform);
 
         let mut support = LinearSupport::<isize>::new(3);
+
+        inverse(&mut support, transform);
+
+        let res = vec![3, 8, 2];
+        
+        assert_eq!(res, support.data);
+    }
+
+    #[test]
+    fn linear_test_missing_data() {
+        let mut support = LinearSupport::<isize>::new(3);
+        support.data[0] = 3;
+        support.data[1] = 8;
+        support.data[2] = 2;
+
+        let mut transform = Transform::<isize>::new();
+        transform.push(Projection::<isize>::new(1, 0, 0));
+        transform.push(Projection::<isize>::new(1, 1, 0));
+        transform.push(Projection::<isize>::new(0, 1, 0));
+        transform.push(Projection::<isize>::new(-1, 1, 0));
+
+        direct(support, &mut transform);
+
+        let mut support = LinearSupport::<isize>::new(3);
+
+        transform.pop();
+        transform.pop();
 
         inverse(&mut support, transform);
 
