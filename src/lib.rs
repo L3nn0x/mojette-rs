@@ -16,6 +16,20 @@ pub fn katz_criterion<T: Default + std::clone::Clone>(projections: &Transform<T>
     }
 }
 
+pub fn total_farey_angles(n: usize) -> usize {
+    return (0.304 * n as f64 * n as f64 + 0.5) as usize;
+}
+
+pub fn next_farey_angle_compact(n: usize, angle1: (i16, u16), angle2: (i16, u16)) -> (i16, u16) {
+    let p1 = angle1.0;
+    let q1 = angle1.1;
+    let p2 = angle2.0;
+    let q2 = angle2.1;
+
+    ((((q1 as isize + p1 as isize + n as isize) as f64 / q2 as f64) * p2 as f64 - p1 as f64).floor() as i16,
+    (((q1 as isize + p1 as isize + n as isize) as f64 / q2 as f64) * q2 as f64 - q1 as f64).floor() as u16)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
